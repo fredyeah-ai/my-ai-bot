@@ -3,25 +3,35 @@ import requests
 import xml.etree.ElementTree as ET
 
 def get_summary(title, api_key):
-    """呼叫 Gemini 2.0 API 根據標題生成 50 字內的廣東話簡介"""
+    """呼叫 OpenRouter 免費 AI 模型根據標題生成 50 字內的廣東話簡介"""
     if not api_key:
         return "（未配置 AI 金鑰，無法提供簡介）"
         
-    # 💡 關鍵修復：將 gemini-1.5-flash 改為最新支援的 gemini-2.0-flash
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-    headers = {'Content-Type': 'application/json'}
+    # 💡 改為呼叫 OpenRouter 泛用接口
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
     
     prompt = f"請根據以下新聞標題，用50字內、親切流暢嘅香港廣東話（口語化）簡介呢則新聞大概講咩，唔好講廢話：\n【{title}】"
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    
+    # 💡 使用 Meta Llama 3 8B 永久免費模型，絕不封鎖 GitHub Actions
+    payload = {
+        "model": "meta-llama/llama-3-8b-instruct:free",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }
     
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response = requests.post(url, headers=headers, json=payload, timeout=12)
         if response.status_code == 200:
             data = response.json()
-            summary = data['candidates'][0]['content']['parts'][0]['text'].strip()
+            summary = data['choices'][0]['message']['content'].strip()
             return summary.replace('"', '').replace('「', '').replace('」', '')
         
-        print(f"⚠️ Google API 拒絕連線！狀態碼: {response.status_code}")
+        print(f"⚠️ OpenRouter API 拒絕連線！狀態碼: {response.status_code}")
         print(f"⚠️ 錯誤原因: {response.text}")
         return "（簡介生成失敗）"
     except Exception as e:
@@ -30,7 +40,8 @@ def get_summary(title, api_key):
 def fetch_and_send():
     bot_token = os.environ.get('TG_BOT_TOKEN')
     chat_id = os.environ.get('TG_CHAT_ID')
-    gemini_key = os.environ.get('GEMINI_API_KEY')
+    # 💡 這裡繼續延用舊名稱，但裡面裝的是 OpenRouter 的 Key
+    ai_key = os.environ.get('GEMINI_API_KEY')
 
     if not bot_token or not chat_id:
         print("錯誤：找不到環境變數")
@@ -47,7 +58,7 @@ def fetch_and_send():
         
         if not items: return
 
-        message = "🤖 <b>今日 AI 科技頭條推送 (Gemini 2.0 升級版)</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        message = "🤖 <b>今日 AI 科技頭條推送 (OpenRouter 免費 AI 升級版)</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
         
         for i, item in enumerate(items, 1):
             title = item.find('title').text
@@ -56,7 +67,7 @@ def fetch_and_send():
                 title = title.rsplit(" - ", 1)[0]
             
             print(f"正在為第 {i} 條新聞生成 AI 簡介...")
-            summary = get_summary(title, gemini_key)
+            summary = get_summary(title, ai_key)
             
             message += f"{i}️⃣ <b>{title}</b>\n📝 <i>{summary}</i>\n🔗 <a href='{link}'>點擊閱讀全文</a>\n\n"
             message += "━━━━━━━━━━━━━━━━━━━━\n\n"
