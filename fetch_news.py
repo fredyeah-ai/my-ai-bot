@@ -7,7 +7,6 @@ def get_summary(title, api_key):
     if not api_key:
         return "（未配置 AI 金鑰，無法提供簡介）"
         
-    # 💡 改為呼叫 OpenRouter 泛用接口
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -16,9 +15,9 @@ def get_summary(title, api_key):
     
     prompt = f"請根據以下新聞標題，用50字內、親切流暢嘅香港廣東話（口語化）簡介呢則新聞大概講咩，唔好講廢話：\n【{title}】"
     
-    # 💡 使用 Meta Llama 3 8B 永久免費模型，絕不封鎖 GitHub Actions
+    # 💡 關鍵修復：改用最新、穩定的 Llama 3.1 免費大模型
     payload = {
-        "model": "meta-llama/llama-3-8b-instruct:free",
+        "model": "meta-llama/llama-3.1-8b-instruct:free",
         "messages": [
             {"role": "user", "content": prompt}
         ]
@@ -40,7 +39,6 @@ def get_summary(title, api_key):
 def fetch_and_send():
     bot_token = os.environ.get('TG_BOT_TOKEN')
     chat_id = os.environ.get('TG_CHAT_ID')
-    # 💡 這裡繼續延用舊名稱，但裡面裝的是 OpenRouter 的 Key
     ai_key = os.environ.get('GEMINI_API_KEY')
 
     if not bot_token or not chat_id:
@@ -58,7 +56,7 @@ def fetch_and_send():
         
         if not items: return
 
-        message = "🤖 <b>今日 AI 科技頭條推送 (OpenRouter 免費 AI 升級版)</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        message = "🤖 <b>今日 AI 科技頭條推送 (OpenRouter 3.1 穩定版)</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
         
         for i, item in enumerate(items, 1):
             title = item.find('title').text
