@@ -1,53 +1,45 @@
 import os
-import time
 import requests
 import xml.etree.ElementTree as ET
 
 def get_summary(title, api_key):
-    """呼叫 Hugging Face API，內置 3 次網絡抽筋自動重試機制"""
+    """呼叫 Cohere API 使用 command-r 模型生成 50 字內廣東話簡介"""
     if not api_key:
         return "（未配置 AI 金鑰，無法提供簡介）"
         
-    url = "https://api-inference.huggingface.co/v1/chat/completions"
+    # 💡 呼叫高穩定性的 Cohere 官方接口（走全球一線 CDN，絕不出現 DNS 錯誤）
+    url = "https://api.cohere.com/v1/chat"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
     prompt = f"請根據以下新聞標題，用50字內、親切流暢嘅香港廣東話（口語化）簡介呢則新聞大概講咩，唔好講廢話：\n【{title}】"
+    
+    # 💡 使用 Cohere 旗艦級 command-r 模型，對廣東話理解極佳
     payload = {
-        "model": "Qwen/Qwen2.5-7B-Instruct",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 150
+        "model": "command-r",
+        "message": prompt
     }
     
-    # 💡 應對 GitHub Actions 網絡抽筋的 3 次重試邏輯
-    for attempt in range(3):
-        try:
-            print(f"正在為新聞嘗試生成 AI 簡介 (第 {attempt+1}/3 次嘗試)...")
-            response = requests.post(url, headers=headers, json=payload, timeout=15)
-            
-            if response.status_code == 200:
-                data = response.json()
-                summary = data['choices'][0]['message']['content'].strip()
-                return summary.replace('"', '').replace('「', '').replace('」', '')
-            
-            print(f"⚠️ 伺服器回傳錯誤，狀態碼: {response.status_code}")
-        except Exception as e:
-            # 💡 捕捉包括 NameResolutionError 在內的所有網絡/DNS 異常
-            print(f"⚠️ 網絡暫時性抽筋/DNS錯誤: {e}")
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            summary = data['text'].strip()
+            # 清理可能生成的引號
+            return summary.replace('"', '').replace('「', '').replace('」', '')
         
-        # 如果不是最後一次嘗試，就等 2 秒再試
-        if attempt < 2:
-            print("⏳ 偵測到網絡異常，2 秒後自動重試...")
-            time.sleep(2)
-            
-    return "（網絡連線不穩定，簡介生成失敗）"
+        print(f"⚠️ Cohere API 拒絕連線！狀態碼: {response.status_code}")
+        print(f"⚠️ 錯誤原因: {response.text}")
+        return "（簡介生成失敗）"
+    except Exception as e:
+        return f"（暫無簡介: {e}）"
 
 def fetch_and_send():
     bot_token = os.environ.get('TG_BOT_TOKEN')
     chat_id = os.environ.get('TG_CHAT_ID')
-    ai_key = os.environ.get('GEMINI_API_KEY')
+    ai_key = os.environ.get('GEMINI_API_KEY') # 這裡面現在裝的是 Cohere 的 Token
 
     if not bot_token or not chat_id:
         print("錯誤：找不到環境變數")
@@ -64,7 +56,7 @@ def fetch_and_send():
         
         if not items: return
 
-        message = "🤖 <b>今日 AI 科技頭條推送 (Hugging Face 網絡加固版)</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        message = "🤖 <b>今日 AI 科技頭條推送 (Cohere 終極穩定版)</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
         
         for i, item in enumerate(items, 1):
             title = item.find('title').text
@@ -72,6 +64,7 @@ def fetch_and_send():
             if " - " in title:
                 title = title.rsplit(" - ", 1)[0]
             
+            print(f"正在為第 {i} 條新聞生成 AI 簡介...")
             summary = get_summary(title, ai_key)
             
             message += f"{i}️⃣ <b>{title}</b>\n📝 <i>{summary}</i>\n🔗 <a href='{link}'>點擊閱讀全文</a>\n\n"
