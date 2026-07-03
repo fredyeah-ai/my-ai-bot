@@ -2,7 +2,7 @@ name: Daily AI News Bot
 
 on:
   schedule:
-    - cron: '29 1 * * *' # 香港時間 9:29 AM (等於 UTC 時間 1:29 AM)
+    - cron: '41 1 * * *' # 香港時間 9:29 AM (等於 UTC 時間 1:29 AM)
   workflow_dispatch: # 容許手動點擊執行
 
 jobs:
