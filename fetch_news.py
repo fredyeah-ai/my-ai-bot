@@ -3,11 +3,12 @@ import requests
 import xml.etree.ElementTree as ET
 
 def get_summary(title, api_key):
-    """呼叫 Gemini API 根據標題生成 50 字內的廣東話簡介（除錯加強版）"""
+    """呼叫 Gemini 2.0 API 根據標題生成 50 字內的廣東話簡介"""
     if not api_key:
         return "（未配置 AI 金鑰，無法提供簡介）"
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # 💡 關鍵修復：將 gemini-1.5-flash 改為最新支援的 gemini-2.0-flash
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     headers = {'Content-Type': 'application/json'}
     
     prompt = f"請根據以下新聞標題，用50字內、親切流暢嘅香港廣東話（口語化）簡介呢則新聞大概講咩，唔好講廢話：\n【{title}】"
@@ -20,7 +21,6 @@ def get_summary(title, api_key):
             summary = data['candidates'][0]['content']['parts'][0]['text'].strip()
             return summary.replace('"', '').replace('「', '').replace('」', '')
         
-        # 💡 核心改動：如果失敗，直接將錯誤碼同原因印喺 GitHub Log 入面！
         print(f"⚠️ Google API 拒絕連線！狀態碼: {response.status_code}")
         print(f"⚠️ 錯誤原因: {response.text}")
         return "（簡介生成失敗）"
@@ -43,7 +43,6 @@ def fetch_and_send():
         if response.status_code != 200: return
         
         root = ET.fromstring(response.content)
-        # 💡 這裡原本是 [:3]，依家修改為 [:5] 抓取 5 條新聞！
         items = root.findall('.//item')[:5]
         
         if not items: return
@@ -57,10 +56,8 @@ def fetch_and_send():
                 title = title.rsplit(" - ", 1)[0]
             
             print(f"正在為第 {i} 條新聞生成 AI 簡介...")
-            # 💡 呼叫 Gemini 生成 50 字廣東話簡介
             summary = get_summary(title, gemini_key)
             
-            # 組裝全新訊息格式：包含標題、📝AI簡介、🔗連結
             message += f"{i}️⃣ <b>{title}</b>\n📝 <i>{summary}</i>\n🔗 <a href='{link}'>點擊閱讀全文</a>\n\n"
             message += "━━━━━━━━━━━━━━━━━━━━\n\n"
 
