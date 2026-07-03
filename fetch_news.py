@@ -3,11 +3,12 @@ import requests
 import xml.etree.ElementTree as ET
 
 def get_summary(title, api_key):
-    """呼叫 OpenRouter 免費 AI 模型（具備多模型自動備援機制）"""
+    """呼叫 Hugging Face Serverless API 使用 Qwen 2.5 模型生成 50 字內廣東話簡介"""
     if not api_key:
         return "（未配置 AI 金鑰，無法提供簡介）"
         
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    # 💡 使用 Hugging Face 官方 OpenAI 兼容接口
+    url = "https://api-inference.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
@@ -15,39 +16,30 @@ def get_summary(title, api_key):
     
     prompt = f"請根據以下新聞標題，用50字內、親切流暢嘅香港廣東話（口語化）簡介呢則新聞大概講咩，唔好講廢話：\n【{title}】"
     
-    # 💡 終極備援名單：如果名單內某個模型被官方下架，程式會自動秒速跳去試下一個！
-    # 這裡選用了目前 OpenRouter 最熱門、文字生成效果最好的 4 個免費大模型
-    models_to_try = [
-        "qwen/qwen-2.5-7b-instruct:free",        # 1. 阿里開源旗艦（廣東話同中文理解力極強）
-        "meta-llama/llama-3.2-3b-instruct:free", # 2. Llama 輕量最新版
-        "google/gemma-2-9b-it:free",             # 3. Google 官方開源版
-        "mistralai/mistral-7b-instruct:free"     # 4. 歐洲最強開源模型
-    ]
+    # 💡 調用阿里開源最強的 Qwen 2.5 7B 模型，對中文/廣東話理解力堪稱完美
+    payload = {
+        "model": "Qwen/Qwen2.5-7B-Instruct",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 150
+    }
     
-    for model in models_to_try:
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}]
-        }
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                summary = data['choices'][0]['message']['content'].strip()
-                # 順利拿到簡介，直接中斷循環並回傳
-                return summary.replace('"', '').replace('「', '').replace('」', '')
-            else:
-                print(f"ℹ️ 模型 {model} 暫時無法使用 (狀態碼 {response.status_code})，正在自動嘗試下一個備援模型...")
-        except Exception as e:
-            print(f"ℹ️ 呼叫 {model} 時發生異常: {e}，切換下一個...")
-            continue
-            
-    return "（所有免費 AI 備援模型均被拒絕連線）"
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            summary = data['choices'][0]['message']['content'].strip()
+            return summary.replace('"', '').replace('「', '').replace('」', '')
+        
+        print(f"⚠️ Hugging Face API 拒絕連線！狀態碼: {response.status_code}")
+        print(f"⚠️ 錯誤原因: {response.text}")
+        return "（簡介生成失敗）"
+    except Exception as e:
+        return f"（暫無簡介: {e}）"
 
 def fetch_and_send():
     bot_token = os.environ.get('TG_BOT_TOKEN')
     chat_id = os.environ.get('TG_CHAT_ID')
-    ai_key = os.environ.get('GEMINI_API_KEY')
+    ai_key = os.environ.get('GEMINI_API_KEY') # 這裡面現在裝的是 Hugging Face 的 Token
 
     if not bot_token or not chat_id:
         print("錯誤：找不到環境變數")
@@ -64,7 +56,7 @@ def fetch_and_send():
         
         if not items: return
 
-        message = "🤖 <b>今日 AI 科技頭條推送 (OpenRouter 終極防禦版)</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        message = "🤖 <b>今日 AI 科技頭條推送 (Hugging Face 穩定版)</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
         
         for i, item in enumerate(items, 1):
             title = item.find('title').text
