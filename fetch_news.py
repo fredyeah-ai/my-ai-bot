@@ -3,29 +3,26 @@ import requests
 import xml.etree.ElementTree as ET
 
 def get_summary(title, api_key):
-    """呼叫 Gemini API 根據標題生成 50 字內的廣東話簡介"""
+    """呼叫 Gemini API 根據標題生成 50 字內的廣東話簡介（除錯加強版）"""
     if not api_key:
         return "（未配置 AI 金鑰，無法提供簡介）"
         
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {'Content-Type': 'application/json'}
     
-    # 畀 AI 嘅 Prompt 指令
     prompt = f"請根據以下新聞標題，用50字內、親切流暢嘅香港廣東話（口語化）簡介呢則新聞大概講咩，唔好講廢話：\n【{title}】"
-    
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)
         if response.status_code == 200:
             data = response.json()
             summary = data['candidates'][0]['content']['parts'][0]['text'].strip()
-            # 確保刪除可能出現的引號
             return summary.replace('"', '').replace('「', '').replace('」', '')
+        
+        # 💡 核心改動：如果失敗，直接將錯誤碼同原因印喺 GitHub Log 入面！
+        print(f"⚠️ Google API 拒絕連線！狀態碼: {response.status_code}")
+        print(f"⚠️ 錯誤原因: {response.text}")
         return "（簡介生成失敗）"
     except Exception as e:
         return f"（暫無簡介: {e}）"
